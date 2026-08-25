@@ -7,21 +7,21 @@ const border = (width, height) => {
   return blocked;
 };
 
-const makeMap = ({ id, name, width, height, ground, obstacles, entrances, exits, accents }) => ({
+const makeMap = ({ id, name, width, height, ground, obstacles, entrances, exits, accents, enclosures = [], animalNavigation = [] }) => ({
   id, name, width, height, tileWidth: GRID_SIZE, tileHeight: GRID_SIZE,
   layers: {
     floor: { type: 'tilelayer', ground, accents },
     structure: { type: 'tilelayer', blocked: [...border(width, height), ...obstacles] },
     transitions: { type: 'objectgroup', exits },
     spawns: { type: 'objectgroup', entrances },
-    enclosures: { type: 'objectgroup', objects: [] },
+    enclosures: { type: 'objectgroup', objects: enclosures },
     furniture: { type: 'objectgroup', objects: [] },
     enrichment: { type: 'objectgroup', objects: [] },
     decorations: { type: 'objectgroup', objects: [] },
     foreground: { type: 'tilelayer', data: [] },
     interactions: { type: 'objectgroup', objects: [] },
     npcNavigation: { type: 'tilelayer', data: [] },
-    animalNavigation: { type: 'objectgroup', objects: [] },
+    animalNavigation: { type: 'objectgroup', objects: animalNavigation },
   },
 });
 
@@ -42,6 +42,25 @@ export const MAPS = {
       center_start: { tileX: 9, tileY: 17, facing: 'down' },
       east_path: { tileX: 34, tileY: 11, facing: 'left' },
     },
+    enclosures: [{
+      id: 'meet-and-greet-yard',
+      name: 'Meet-and-Greet Yard',
+      tileX: 6,
+      tileY: 6,
+      width: 7,
+      height: 6,
+      capacity: 2,
+      speciesIds: ['dog'],
+      animalIds: ['dog-maple'],
+    }],
+    animalNavigation: [{
+      id: 'meet-and-greet-yard-navigation',
+      enclosureId: 'meet-and-greet-yard',
+      tileX: 6,
+      tileY: 6,
+      width: 7,
+      height: 6,
+    }],
     exits: [{ id: 'east_path', tileX: 36, tileY: 10, width: 1, height: 3, toMap: 'meadow_path', entranceId: 'west_path' }],
   }),
   meadow_path: makeMap({

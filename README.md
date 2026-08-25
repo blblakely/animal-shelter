@@ -2,9 +2,10 @@
 
 A browser-based 2D animal adoption center management game built with JavaScript, Phaser 3, and Vite.
 
-## Milestone 1
+## Milestones
 
-This first milestone contains only the movement and map foundation: title screen, smooth keyboard movement, four-direction animation, foot collision, two connected 32×32-grid maps, camera following, fade transitions, and an optional debug overlay.
+- Milestone 1 established the movement and map foundation: title screen, smooth keyboard movement, four-direction animation, foot collision, two connected 32×32-grid maps, camera following, fade transitions, and an optional debug overlay.
+- Milestone 2 adds the first data-driven animal: Maple the dog, species and individual records, smooth enclosure-bound wandering, and a nearby animal information card. Care actions, needs decay, intake, adoption, and economy are intentionally deferred.
 
 ## Local development
 
@@ -13,7 +14,7 @@ npm install
 npm run dev
 ```
 
-Open the local address printed by Vite. Use WASD or the arrow keys to move, and press `D` to toggle debug mode.
+Open the local address printed by Vite. Use WASD or the arrow keys to move, `E` to meet a nearby animal, and `D` to toggle debug mode.
 
 ## Checks
 
