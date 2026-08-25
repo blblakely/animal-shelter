@@ -20,7 +20,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     Object.entries(ROW).forEach(([direction, row]) => {
       const key = `walk-${direction}`;
       if (!this.scene.anims.exists(key)) {
-        this.scene.anims.create({ key, frames: this.scene.anims.generateFrameNumbers('temporary-player', { start: row * 4, end: row * 4 + 3 }), frameRate: 9, repeat: -1 });
+        this.scene.anims.create({ key, frames: this.scene.anims.generateFrameNumbers('temporary-player', { start: row * 4, end: row * 4 + 3 }), frameRate: 7, repeat: -1 });
       }
     });
   }
@@ -41,3 +41,4 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.anims.play(`walk-${this.facing}`, true);
   }
 }
+
