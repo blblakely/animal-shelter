@@ -10,7 +10,7 @@ export class WorldScene extends Phaser.Scene {
   constructor() { super('WorldScene'); }
   init(data) { this.mapId = data.mapId ?? 'shelter_grounds'; this.entranceId = data.entranceId ?? 'center_start'; }
   preload() {
-    this.load.spritesheet('temporary-player', 'assets/temporary-player.png', { frameWidth: 64, frameHeight: 96 });
+    this.load.spritesheet('player-girl', 'assets/player-girl.png', { frameWidth: 64, frameHeight: 96 });
     this.load.spritesheet('terrain', 'assets/temporary-terrain.png', { frameWidth: 32, frameHeight: 32 });
   }
   create() {
@@ -35,3 +35,4 @@ export class WorldScene extends Phaser.Scene {
   }
   update() { this.player?.update(); this.debugOverlay?.update(); }
 }
+

@@ -6,7 +6,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   static SPEED = 190;
 
   constructor(scene, x, y, input, facing = 'down') {
-    super(scene, x, y, 'temporary-player', ROW[facing] * 4);
+    super(scene, x, y, 'player-girl', ROW[facing] * 4);
     scene.add.existing(this);
     scene.physics.add.existing(this);
     this.inputController = input;
@@ -20,7 +20,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     Object.entries(ROW).forEach(([direction, row]) => {
       const key = `walk-${direction}`;
       if (!this.scene.anims.exists(key)) {
-        this.scene.anims.create({ key, frames: this.scene.anims.generateFrameNumbers('temporary-player', { start: row * 4, end: row * 4 + 3 }), frameRate: 7, repeat: -1 });
+        this.scene.anims.create({ key, frames: this.scene.anims.generateFrameNumbers('player-girl', { start: row * 4, end: row * 4 + 3 }), frameRate: 7, repeat: -1 });
       }
     });
   }
