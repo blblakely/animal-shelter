@@ -1,4 +1,5 @@
 const INTERACTION_DISTANCE = 88;
+const OPEN_PROFILE_DISTANCE = 180;
 
 const makeTextStyle = (size, color = '#fff4d5') => ({
   fontFamily: 'DM Sans, sans-serif',
@@ -7,10 +8,12 @@ const makeTextStyle = (size, color = '#fff4d5') => ({
 });
 
 export class AnimalInteractionSystem {
-  constructor(scene, player, animalManager) {
+  constructor(scene, player, animalManager, feedingStations, careActions) {
     this.scene = scene;
     this.player = player;
     this.animalManager = animalManager;
+    this.feedingStations = feedingStations;
+    this.careActions = careActions;
     this.selectedAnimal = null;
     this.prompt = scene.add.text(480, 494, '', {
       ...makeTextStyle(15),
@@ -25,7 +28,7 @@ export class AnimalInteractionSystem {
   }
 
   createPanel() {
-    const background = this.scene.add.rectangle(0, 0, 282, 218, 0x173832, 0.96)
+    const background = this.scene.add.rectangle(0, 0, 282, 252, 0x173832, 0.96)
       .setOrigin(0)
       .setStrokeStyle(3, 0xf2ca78);
     this.nameText = this.scene.add.text(18, 15, '', { ...makeTextStyle(25), fontFamily: 'Fredoka, sans-serif' });
@@ -34,7 +37,7 @@ export class AnimalInteractionSystem {
     this.behaviorText = this.scene.add.text(18, 108, '', makeTextStyle(13, '#ffffff'));
     this.needsText = this.scene.add.text(18, 137, '', { ...makeTextStyle(13, '#d7e8da'), lineSpacing: 5 });
     this.closeText = this.scene.add.text(264, 12, 'E / Esc', makeTextStyle(11, '#a8c9b8')).setOrigin(1, 0);
-    return this.scene.add.container(658, 286, [
+    return this.scene.add.container(658, 252, [
       background,
       this.nameText,
       this.detailsText,
@@ -46,12 +49,24 @@ export class AnimalInteractionSystem {
   }
 
   toggleNearest() {
+    if (this.careActions.isBusy) return;
     if (this.selectedAnimal) {
       this.close();
       return;
     }
+    const station = this.feedingStations.findNearestInteraction(this.player.x, this.player.y, INTERACTION_DISTANCE);
     const nearest = this.animalManager.findNearest(this.player.x, this.player.y, INTERACTION_DISTANCE);
+    if (this.shouldPrioritizeStation(station, nearest) && this.careActions.fillBowl(station)) return;
     if (nearest) this.open(nearest);
+  }
+
+  shouldPrioritizeStation(station, animal) {
+    if (!station || station.state.isFilled) return false;
+    if (!animal) return true;
+    const point = station.playerInteractionPoint;
+    const stationDistance = Math.hypot(point.x - this.player.x, point.y - this.player.y);
+    const animalDistance = Math.hypot(animal.x - this.player.x, animal.y - this.player.y);
+    return stationDistance <= animalDistance;
   }
 
   open(animal) {
@@ -70,9 +85,12 @@ export class AnimalInteractionSystem {
     const data = this.selectedAnimal.animalData;
     this.behaviorText.setText(`Now: ${data.currentBehavior}`);
     this.needsText.setText([
-      `Health ${data.needs.health}   Happiness ${data.needs.happiness}`,
-      `Energy ${data.needs.energy}   Social ${data.needs.social}`,
-      'Care actions arrive in a later milestone.',
+      `Hunger       ${Math.round(data.needs.hunger)} / 100`,
+      `Cleanliness  ${Math.round(data.needs.cleanliness)} / 100`,
+      `Happiness    ${Math.round(data.needs.happiness)} / 100`,
+      `Health       ${Math.round(data.needs.health)} / 100`,
+      `Energy       ${Math.round(data.needs.energy)} / 100`,
+      `Social       ${Math.round(data.needs.social)} / 100`,
     ]);
   }
 
@@ -83,12 +101,19 @@ export class AnimalInteractionSystem {
 
   update() {
     const nearest = this.animalManager.findNearest(this.player.x, this.player.y, INTERACTION_DISTANCE);
+    const station = this.feedingStations.findNearestInteraction(this.player.x, this.player.y, INTERACTION_DISTANCE);
     if (this.selectedAnimal) {
-      const stillNearby = nearest === this.selectedAnimal;
+      const stillNearby = Math.hypot(
+        this.selectedAnimal.x - this.player.x,
+        this.selectedAnimal.y - this.player.y,
+      ) <= OPEN_PROFILE_DISTANCE;
       if (!stillNearby) this.close();
       else this.updatePanelValues();
     }
-    this.prompt.setVisible(Boolean(nearest) && !this.selectedAnimal);
-    if (nearest && !this.selectedAnimal) this.prompt.setText(`E · Meet ${nearest.animalData.name}`);
+    const canFill = this.shouldPrioritizeStation(station, nearest);
+    const promptVisible = !this.careActions.isBusy && !this.selectedAnimal && (canFill || nearest);
+    this.prompt.setVisible(Boolean(promptVisible));
+    if (canFill && !this.selectedAnimal) this.prompt.setText(`E · Fill ${station.definition.displayName}`);
+    else if (nearest && !this.selectedAnimal) this.prompt.setText(`E · Meet ${nearest.animalData.name}`);
   }
 }

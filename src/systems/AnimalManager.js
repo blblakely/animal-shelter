@@ -4,11 +4,14 @@ import { getAnimalsForMap } from '../data/animals.js';
 import { getSpeciesDefinition } from '../data/species.js';
 import { Animal } from '../entities/Animal.js';
 import { AnimalNavigationSystem } from './AnimalNavigationSystem.js';
+import { AnimalNeedsSystem } from './AnimalNeedsSystem.js';
 
 export class AnimalManager {
-  constructor(scene, mapManager) {
+  constructor(scene, mapManager, feedingStations) {
     this.scene = scene;
     this.mapManager = mapManager;
+    this.feedingStations = feedingStations;
+    this.needsSystem = new AnimalNeedsSystem();
     this.animals = [];
   }
 
@@ -26,15 +29,22 @@ export class AnimalManager {
         animalData,
         species,
         new AnimalNavigationSystem(this.mapManager, region),
+        this.feedingStations,
       );
       this.scene.physics.add.collider(animal, this.mapManager.structureLayer);
       this.animals.push(animal);
     });
+    this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.animals.forEach((animal) => animal.releaseStation());
+    });
     return this;
   }
 
-  update(time) {
-    this.animals.forEach((animal) => animal.update(time));
+  update(time, elapsedGameMinutes) {
+    this.animals.forEach((animal) => {
+      this.needsSystem.update(animal.animalData, animal.species, animal.animalData.currentBehavior, elapsedGameMinutes);
+      animal.update(time);
+    });
   }
 
   findNearest(x, y, maximumDistance) {
