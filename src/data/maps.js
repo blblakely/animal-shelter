@@ -7,21 +7,21 @@ const border = (width, height) => {
   return blocked;
 };
 
-const makeMap = ({ id, name, width, height, ground, obstacles, entrances, exits, accents, enclosures = [], animalNavigation = [] }) => ({
+const makeMap = ({ id, name, width, height, ground, obstacles, entrances, exits, accents }) => ({
   id, name, width, height, tileWidth: GRID_SIZE, tileHeight: GRID_SIZE,
   layers: {
     floor: { type: 'tilelayer', ground, accents },
     structure: { type: 'tilelayer', blocked: [...border(width, height), ...obstacles] },
     transitions: { type: 'objectgroup', exits },
     spawns: { type: 'objectgroup', entrances },
-    enclosures: { type: 'objectgroup', objects: enclosures },
+    enclosures: { type: 'objectgroup', source: 'enclosure-registry' },
     furniture: { type: 'objectgroup', objects: [] },
     enrichment: { type: 'objectgroup', objects: [] },
     decorations: { type: 'objectgroup', objects: [] },
     foreground: { type: 'tilelayer', data: [] },
     interactions: { type: 'objectgroup', objects: [] },
     npcNavigation: { type: 'tilelayer', data: [] },
-    animalNavigation: { type: 'objectgroup', objects: animalNavigation },
+    animalNavigation: { type: 'objectgroup', source: 'enclosure-registry' },
   },
 });
 
@@ -29,10 +29,6 @@ export const MAPS = {
   shelter_grounds: makeMap({
     id: 'shelter_grounds', name: 'Shelter Grounds', width: 38, height: 24, ground: 'grass',
     obstacles: [
-      ...Array.from({ length: 9 }, (_, i) => [5 + i, 5]),
-      ...Array.from({ length: 6 }, (_, i) => [5, 6 + i]),
-      ...Array.from({ length: 9 }, (_, i) => [5 + i, 12]),
-      ...Array.from({ length: 5 }, (_, i) => [13, 6 + i]),
       ...Array.from({ length: 7 }, (_, i) => [20 + i, 15]),
       ...Array.from({ length: 4 }, (_, i) => [26, 16 + i]),
       [17, 8], [18, 8], [17, 9], [18, 9], [29, 5], [30, 5], [29, 6], [30, 6],
@@ -42,25 +38,6 @@ export const MAPS = {
       center_start: { tileX: 9, tileY: 17, facing: 'down' },
       east_path: { tileX: 34, tileY: 11, facing: 'left' },
     },
-    enclosures: [{
-      id: 'meet-and-greet-yard',
-      name: 'Meet-and-Greet Yard',
-      tileX: 6,
-      tileY: 6,
-      width: 7,
-      height: 6,
-      capacity: 2,
-      speciesIds: ['dog'],
-      animalIds: ['dog-maple'],
-    }],
-    animalNavigation: [{
-      id: 'meet-and-greet-yard-navigation',
-      enclosureId: 'meet-and-greet-yard',
-      tileX: 6,
-      tileY: 6,
-      width: 7,
-      height: 6,
-    }],
     exits: [{ id: 'east_path', tileX: 36, tileY: 10, width: 1, height: 3, toMap: 'meadow_path', entranceId: 'west_path' }],
   }),
   meadow_path: makeMap({

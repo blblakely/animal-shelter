@@ -14,6 +14,10 @@ import { FeedingStationSystem } from '../systems/FeedingStationSystem.js';
 import { CareActionSystem } from '../systems/CareActionSystem.js';
 import { GameTimeSystem, resolveDevelopmentTimeScale } from '../systems/GameTimeSystem.js';
 import { GameTimeHud } from '../systems/GameTimeHud.js';
+import { ENCLOSURES } from '../data/enclosures.js';
+import { CARE_STATIONS } from '../data/careStations.js';
+import { EnclosureRegistry } from '../systems/EnclosureSystem.js';
+import { CareStationSystem } from '../systems/CareStationSystem.js';
 
 export class WorldScene extends Phaser.Scene {
   constructor() { super('WorldScene'); }
@@ -29,10 +33,14 @@ export class WorldScene extends Phaser.Scene {
       const { key, path, frameWidth, frameHeight } = station.sprite;
       this.load.spritesheet(key, path, { frameWidth, frameHeight });
     });
+    CARE_STATIONS.forEach((station) => this.load.image(station.sprite.key, station.sprite.path));
   }
   create() {
     const definition = getMapDefinition(this.mapId);
-    this.mapManager = new MapManager(this, definition).create();
+    this.enclosures = new EnclosureRegistry(ENCLOSURES);
+    const savedEnclosures = this.registry.get('enclosureSaveData');
+    if (savedEnclosures) this.enclosures.restore(savedEnclosures);
+    this.mapManager = new MapManager(this, definition, this.enclosures, CARE_STATIONS).create();
     this.gameTime = new GameTimeSystem(GAME_TIME_CONFIG, this.registry.get('gameTimeMinutes'));
     this.gameTime.setTimeScale(resolveDevelopmentTimeScale(globalThis.location?.search ?? '', GAME_TIME_CONFIG.developmentTimeScale));
     this.gameTimeHud = new GameTimeHud(this, this.gameTime);
@@ -40,13 +48,15 @@ export class WorldScene extends Phaser.Scene {
     const spawn = this.mapManager.getSpawn(this.entranceId);
     this.player = new Player(this, spawn.x, spawn.y, this.inputController, spawn.facing);
     this.physics.add.collider(this.player, this.mapManager.structureLayer);
-    this.feedingStations = new FeedingStationSystem(this, this.mapManager).create();
-    this.animalManager = new AnimalManager(this, this.mapManager, this.feedingStations).create();
-    this.careActions = new CareActionSystem(this, this.player, this.feedingStations);
-    this.animalInteraction = new AnimalInteractionSystem(this, this.player, this.animalManager, this.feedingStations, this.careActions);
+    this.feedingStations = new FeedingStationSystem(this, this.mapManager, this.enclosures).create();
+    this.careStations = new CareStationSystem(this, this.mapManager).create();
+    this.careStations.connectPlayerCollision(this.player);
+    this.animalManager = new AnimalManager(this, this.mapManager, this.feedingStations, this.enclosures).create();
+    this.careActions = new CareActionSystem(this, this.player, this.feedingStations, this.careStations, this.enclosures);
+    this.animalInteraction = new AnimalInteractionSystem(this, this.player, this.animalManager, this.feedingStations, this.careStations, this.careActions);
     this.transitionManager = new TransitionManager(this, definition.layers.transitions.exits);
     this.transitionManager.connect(this.player);
-    this.debugOverlay = new DebugOverlay(this, this.mapManager, this.transitionManager, this.player, this.animalManager, this.feedingStations);
+    this.debugOverlay = new DebugOverlay(this, this.mapManager, this.transitionManager, this.player, this.animalManager, this.feedingStations, this.careStations, this.enclosures, this.careActions);
     this.cameras.main.startFollow(this.player, true, .12, .12);
     this.cameras.main.fadeIn(260, 16, 35, 33);
     this.add.text(18, 18, definition.name, { fontFamily: 'Fredoka, sans-serif', fontSize: '22px', color: '#fff4d5', stroke: '#25443b', strokeThickness: 5 }).setScrollFactor(0).setDepth(50);
@@ -57,7 +67,10 @@ export class WorldScene extends Phaser.Scene {
       this.add.rectangle(x, y, exit.width * 32, exit.height * 32, 0xf6d66f, .4).setDepth(2);
       this.tweens.add({ targets: this.add.rectangle(x, y, 10, exit.height * 25, 0xfff2ad, .8).setDepth(3), alpha: .2, yoyo: true, repeat: -1, duration: 650 });
     });
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.registry.set('gameTimeMinutes', this.gameTime.totalMinutes));
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.registry.set('gameTimeMinutes', this.gameTime.totalMinutes);
+      this.registry.set('enclosureSaveData', this.enclosures.serialize());
+    });
     this.events.on(Phaser.Scenes.Events.PAUSE, () => this.gameTime.setPaused(true));
     this.events.on(Phaser.Scenes.Events.RESUME, () => this.gameTime.setPaused(false));
   }
@@ -67,6 +80,7 @@ export class WorldScene extends Phaser.Scene {
     if (this.careActions?.isBusy) this.player?.setVelocity(0);
     else this.player?.update();
     this.animalManager?.update(time, elapsedGameMinutes);
+    this.careActions?.update(time, delta);
     this.animalInteraction?.update();
     this.gameTimeHud?.update();
     this.debugOverlay?.update();

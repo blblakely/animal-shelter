@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { ANIMALS } from '../src/data/animals.js';
 import { SPECIES } from '../src/data/species.js';
-import { getMapDefinition } from '../src/data/maps.js';
+import { getEnclosureDefinition } from '../src/data/enclosures.js';
+import { cellKey } from '../src/systems/GridCells.js';
 
 describe('animal data contracts', () => {
   it('uses unique IDs and registered species', () => {
@@ -9,17 +10,12 @@ describe('animal data contracts', () => {
     ANIMALS.forEach((animal) => expect(SPECIES[animal.speciesId]).toBeDefined());
   });
 
-  it('places every animal in a declared enclosure and navigation region', () => {
+  it('places every animal in a declared cell-based enclosure and navigation region', () => {
     ANIMALS.forEach((animal) => {
-      const map = getMapDefinition(animal.location.mapId);
-      const enclosure = map.layers.enclosures.objects.find(({ id }) => id === animal.location.enclosureId);
-      const navigation = map.layers.animalNavigation.objects.find(({ enclosureId }) => enclosureId === animal.location.enclosureId);
-      expect(enclosure?.animalIds).toContain(animal.id);
-      expect(navigation).toBeDefined();
-      expect(animal.location.spawn.tileX).toBeGreaterThanOrEqual(navigation.tileX);
-      expect(animal.location.spawn.tileX).toBeLessThan(navigation.tileX + navigation.width);
-      expect(animal.location.spawn.tileY).toBeGreaterThanOrEqual(navigation.tileY);
-      expect(animal.location.spawn.tileY).toBeLessThan(navigation.tileY + navigation.height);
+      const enclosure = getEnclosureDefinition(animal.location.enclosureId);
+      expect(enclosure.mapId).toBe(animal.location.mapId);
+      expect(enclosure.allowedSpecies).toContain(animal.speciesId);
+      expect(new Set(enclosure.animalNavigationCells.map(cellKey)).has(cellKey(animal.location.spawn))).toBe(true);
     });
   });
 

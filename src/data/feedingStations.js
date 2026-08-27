@@ -1,26 +1,17 @@
-export const FEEDING_STATIONS = [
-  {
-    id: 'maple-food-bowl',
-    displayName: "Maple's Bowl",
-    mapId: 'shelter_grounds',
-    enclosureId: 'meet-and-greet-yard',
-    animalId: 'dog-maple',
-    defaultFoodId: 'basic-dog-food',
-    tileX: 7,
-    tileY: 7,
-    footprint: { width: 1, height: 1 },
-    playerInteraction: { tileX: 7, tileY: 8 },
-    animalUse: { tileX: 7, tileY: 8, facing: 'up' },
-    sprite: {
-      key: 'temporary-food-bowl',
-      path: 'assets/temporary-food-bowl.png',
-      frameWidth: 32,
-      frameHeight: 32,
-      emptyFrame: 0,
-      filledFrame: 1,
-    },
-  },
-];
+import { ENCLOSURES } from './enclosures.js';
+
+export const asFeedingStationDefinition = (object) => ({
+  ...object,
+  id: object.instanceId,
+  displayName: object.animalId === 'dog-maple' ? "Maple's Bowl" : object.displayName,
+  playerInteraction: object.playerInteractionPositions[0],
+  animalUse: object.animalInteractionPositions[0],
+});
+
+export const FEEDING_STATIONS = ENCLOSURES
+  .flatMap((enclosure) => enclosure.installedObjects)
+  .filter(({ objectType }) => objectType === 'feeding_station')
+  .map(asFeedingStationDefinition);
 
 export function getFeedingStationsForMap(mapId) {
   return FEEDING_STATIONS.filter((station) => station.mapId === mapId);

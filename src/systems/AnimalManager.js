@@ -7,19 +7,19 @@ import { AnimalNavigationSystem } from './AnimalNavigationSystem.js';
 import { AnimalNeedsSystem } from './AnimalNeedsSystem.js';
 
 export class AnimalManager {
-  constructor(scene, mapManager, feedingStations) {
+  constructor(scene, mapManager, feedingStations, enclosureRegistry) {
     this.scene = scene;
     this.mapManager = mapManager;
     this.feedingStations = feedingStations;
+    this.enclosureRegistry = enclosureRegistry;
     this.needsSystem = new AnimalNeedsSystem();
     this.animals = [];
   }
 
   create() {
-    const navigationRegions = this.mapManager.definition.layers.animalNavigation.objects;
     getAnimalsForMap(this.mapManager.definition.id).forEach((animalData) => {
-      const region = navigationRegions.find((candidate) => candidate.enclosureId === animalData.location.enclosureId);
-      if (!region) throw new Error(`Missing navigation region for ${animalData.id}`);
+      const enclosure = this.enclosureRegistry.get(animalData.location.enclosureId);
+      if (!enclosure) throw new Error(`Missing enclosure for ${animalData.id}`);
       const species = getSpeciesDefinition(animalData.speciesId);
       const spawn = animalData.location.spawn;
       const animal = new Animal(
@@ -28,7 +28,7 @@ export class AnimalManager {
         (spawn.tileY + 0.5) * GRID_SIZE,
         animalData,
         species,
-        new AnimalNavigationSystem(this.mapManager, region),
+        new AnimalNavigationSystem(this.mapManager, enclosure),
         this.feedingStations,
       );
       this.scene.physics.add.collider(animal, this.mapManager.structureLayer);

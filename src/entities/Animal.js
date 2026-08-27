@@ -13,6 +13,10 @@ export class Animal extends Phaser.Physics.Arcade.Sprite {
     this.feedingStations = feedingStations;
     this.facing = 'down';
     this.target = null;
+    this.route = [];
+    this.routeKind = null;
+    this.routeCompletion = null;
+    this.routeFailure = null;
     this.reservedStation = null;
     this.eatingEndsAt = null;
     this.nextMoveAt = scene.time.now + this.randomIdleDuration();
@@ -55,8 +59,9 @@ export class Animal extends Phaser.Physics.Arcade.Sprite {
   }
 
   startWandering() {
-    this.target = this.navigation.nextTarget();
-    this.setBehavior('Exploring');
+    const route = this.navigation.nextRoute({ x: this.x, y: this.y });
+    if (!route) return this.stopWandering(this.scene.time.now);
+    return this.beginRoute(route, 'Exploring', 'wander', (time) => this.stopWandering(time));
   }
 
   setBehavior(behavior) { this.animalData.currentBehavior = behavior; }
@@ -69,21 +74,22 @@ export class Animal extends Phaser.Physics.Arcade.Sprite {
   }
 
   stopWandering(time, behavior = 'Relaxing') {
+    this.clearRoute();
     this.target = null;
     this.stopAtFacing();
     this.nextMoveAt = time + this.randomIdleDuration();
     this.setBehavior(behavior);
   }
 
-  moveTowardTarget(time, onArrival) {
+  moveTowardTarget(time, onArrival, onBlocked) {
     const toTarget = new Phaser.Math.Vector2(this.target.x - this.x, this.target.y - this.y);
     if (toTarget.lengthSq() <= 64) {
       onArrival();
       return;
     }
     if (this.body.blocked.none === false) {
-      if (this.reservedStation) this.releaseStation();
-      this.stopWandering(time);
+      if (onBlocked) onBlocked(time);
+      else this.stopWandering(time);
       return;
     }
     toTarget.normalize().scale(this.species.movement.speed);
@@ -102,12 +108,22 @@ export class Animal extends Phaser.Physics.Arcade.Sprite {
   startSeekingFood(station) {
     if (!this.feedingStations.reserve(station, this.animalData.id)) return false;
     this.reservedStation = station;
-    this.target = station.animalUsePoint;
-    this.setBehavior('Seeking food');
-    return true;
+    const route = this.navigation.routeTo({ x: this.x, y: this.y }, station.animalUsePoint);
+    if (!route) {
+      this.releaseStation();
+      return false;
+    }
+    return this.beginRoute(
+      route,
+      'Seeking food',
+      'feeding',
+      (time) => this.startEating(time),
+      (time) => { this.releaseStation(); this.stopWandering(time, 'Hungry'); },
+    );
   }
 
   startEating(time) {
+    this.clearRoute();
     this.target = this.reservedStation.animalUsePoint;
     this.stopAtFacing(this.reservedStation.definition.animalUse.facing);
     this.setBehavior('Eating');
@@ -131,21 +147,69 @@ export class Animal extends Phaser.Physics.Arcade.Sprite {
     this.stopWandering(time);
   }
 
+  beginRoute(waypoints, behavior, kind, onComplete, onFailure = null) {
+    if (!waypoints?.length) return false;
+    this.route = waypoints.map((point) => ({ ...point }));
+    this.routeKind = kind;
+    this.routeCompletion = onComplete;
+    this.routeFailure = onFailure;
+    this.target = this.route.shift();
+    this.setBehavior(behavior);
+    return true;
+  }
+
+  clearRoute() {
+    this.route = [];
+    this.routeKind = null;
+    this.routeCompletion = null;
+    this.routeFailure = null;
+  }
+
+  advanceRoute(time) {
+    if (this.route.length > 0) {
+      this.target = this.route.shift();
+      return;
+    }
+    const completion = this.routeCompletion;
+    this.clearRoute();
+    this.target = null;
+    completion?.(time);
+  }
+
+  failRoute(time) {
+    const failure = this.routeFailure;
+    this.clearRoute();
+    this.target = null;
+    this.stopAtFacing();
+    failure?.(time);
+  }
+
+  assignCareRoute(waypoints, behavior, onComplete, onFailure) {
+    return this.beginRoute(waypoints, behavior, 'care', onComplete, onFailure);
+  }
+
+  cancelAssignedRoute() {
+    this.clearRoute();
+    this.target = null;
+    this.stopAtFacing();
+  }
+
   update(time) {
     this.setDepth(9 + this.y / 10000);
 
-    if (this.animalData.currentBehavior === 'Eating') {
-      if (time >= this.eatingEndsAt) this.finishEating(time);
-      return;
-    }
-
-    if (this.animalData.currentBehavior === 'Seeking food') {
-      if (!this.reservedStation?.state.isFilled || this.reservedStation.state.reservedBy !== this.animalData.id) {
+    if (this.routeKind) {
+      if (this.routeKind === 'feeding'
+        && (!this.reservedStation?.state.isFilled || this.reservedStation.state.reservedBy !== this.animalData.id)) {
         this.releaseStation();
         this.stopWandering(time, 'Hungry');
         return;
       }
-      this.moveTowardTarget(time, () => this.startEating(time));
+      this.moveTowardTarget(time, () => this.advanceRoute(time), () => this.failRoute(time));
+      return;
+    }
+
+    if (this.animalData.currentBehavior === 'Eating') {
+      if (time >= this.eatingEndsAt) this.finishEating(time);
       return;
     }
 

@@ -8,11 +8,12 @@ const makeTextStyle = (size, color = '#fff4d5') => ({
 });
 
 export class AnimalInteractionSystem {
-  constructor(scene, player, animalManager, feedingStations, careActions) {
+  constructor(scene, player, animalManager, feedingStations, careStations, careActions) {
     this.scene = scene;
     this.player = player;
     this.animalManager = animalManager;
     this.feedingStations = feedingStations;
+    this.careStations = careStations;
     this.careActions = careActions;
     this.selectedAnimal = null;
     this.prompt = scene.add.text(480, 494, '', {
@@ -22,13 +23,15 @@ export class AnimalInteractionSystem {
     }).setOrigin(0.5).setScrollFactor(0).setDepth(200).setVisible(false);
     this.panel = this.createPanel();
     this.interactKey = scene.input.keyboard.addKey('E');
+    this.washKey = scene.input.keyboard.addKey('W');
     this.closeKey = scene.input.keyboard.addKey('ESC');
     this.interactKey.on('down', () => this.toggleNearest());
+    this.washKey.on('down', () => this.chooseWash());
     this.closeKey.on('down', () => this.close());
   }
 
   createPanel() {
-    const background = this.scene.add.rectangle(0, 0, 282, 252, 0x173832, 0.96)
+    const background = this.scene.add.rectangle(0, 0, 282, 286, 0x173832, 0.96)
       .setOrigin(0)
       .setStrokeStyle(3, 0xf2ca78);
     this.nameText = this.scene.add.text(18, 15, '', { ...makeTextStyle(25), fontFamily: 'Fredoka, sans-serif' });
@@ -36,6 +39,7 @@ export class AnimalInteractionSystem {
     this.traitsText = this.scene.add.text(18, 77, '', makeTextStyle(13, '#f6d697'));
     this.behaviorText = this.scene.add.text(18, 108, '', makeTextStyle(13, '#ffffff'));
     this.needsText = this.scene.add.text(18, 137, '', { ...makeTextStyle(13, '#d7e8da'), lineSpacing: 5 });
+    this.washText = this.scene.add.text(18, 254, '', makeTextStyle(13, '#f6d697'));
     this.closeText = this.scene.add.text(264, 12, 'E / Esc', makeTextStyle(11, '#a8c9b8')).setOrigin(1, 0);
     return this.scene.add.container(658, 252, [
       background,
@@ -44,6 +48,7 @@ export class AnimalInteractionSystem {
       this.traitsText,
       this.behaviorText,
       this.needsText,
+      this.washText,
       this.closeText,
     ]).setScrollFactor(0).setDepth(201).setVisible(false);
   }
@@ -54,6 +59,8 @@ export class AnimalInteractionSystem {
       this.close();
       return;
     }
+    const careStation = this.careStations.findNearestInteraction(this.player.x, this.player.y, INTERACTION_DISTANCE);
+    if (careStation && this.careActions.beginReservedAction(careStation)) return;
     const station = this.feedingStations.findNearestInteraction(this.player.x, this.player.y, INTERACTION_DISTANCE);
     const nearest = this.animalManager.findNearest(this.player.x, this.player.y, INTERACTION_DISTANCE);
     if (this.shouldPrioritizeStation(station, nearest) && this.careActions.fillBowl(station)) return;
@@ -92,6 +99,16 @@ export class AnimalInteractionSystem {
       `Energy       ${Math.round(data.needs.energy)} / 100`,
       `Social       ${Math.round(data.needs.social)} / 100`,
     ]);
+    this.washText.setText(this.careActions.canRequestWash(this.selectedAnimal)
+      ? 'W · Choose Wash'
+      : 'Wash unavailable right now');
+  }
+
+  chooseWash() {
+    if (!this.selectedAnimal || !this.careActions.canRequestWash(this.selectedAnimal)) return;
+    const animal = this.selectedAnimal;
+    this.close();
+    this.careActions.requestWash(animal);
   }
 
   close() {
@@ -102,6 +119,7 @@ export class AnimalInteractionSystem {
   update() {
     const nearest = this.animalManager.findNearest(this.player.x, this.player.y, INTERACTION_DISTANCE);
     const station = this.feedingStations.findNearestInteraction(this.player.x, this.player.y, INTERACTION_DISTANCE);
+    const careStation = this.careStations.findNearestInteraction(this.player.x, this.player.y, INTERACTION_DISTANCE);
     if (this.selectedAnimal) {
       const stillNearby = Math.hypot(
         this.selectedAnimal.x - this.player.x,
@@ -111,9 +129,11 @@ export class AnimalInteractionSystem {
       else this.updatePanelValues();
     }
     const canFill = this.shouldPrioritizeStation(station, nearest);
-    const promptVisible = !this.careActions.isBusy && !this.selectedAnimal && (canFill || nearest);
+    const canBeginCare = careStation && this.careActions.canBeginReservedAction(careStation);
+    const promptVisible = !this.careActions.isBusy && !this.selectedAnimal && (canBeginCare || canFill || nearest);
     this.prompt.setVisible(Boolean(promptVisible));
-    if (canFill && !this.selectedAnimal) this.prompt.setText(`E · Fill ${station.definition.displayName}`);
+    if (canBeginCare && !this.selectedAnimal) this.prompt.setText(`E · Wash Maple`);
+    else if (canFill && !this.selectedAnimal) this.prompt.setText(`E · Fill ${station.definition.displayName}`);
     else if (nearest && !this.selectedAnimal) this.prompt.setText(`E · Meet ${nearest.animalData.name}`);
   }
 }

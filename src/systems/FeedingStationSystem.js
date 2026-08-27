@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { GRID_SIZE } from '../config/constants.js';
 import { getAnimalsForMap } from '../data/animals.js';
-import { getFeedingStationsForMap } from '../data/feedingStations.js';
+import { asFeedingStationDefinition } from '../data/feedingStations.js';
 import { getFoodDefinition, isFoodCompatible } from '../data/foods.js';
 import { getSpeciesDefinition } from '../data/species.js';
 import { completePhysicalFeeding } from './FeedingBehavior.js';
@@ -32,21 +32,53 @@ class FeedingStationView extends Phaser.GameObjects.Sprite {
 }
 
 export class FeedingStationSystem {
-  constructor(scene, mapManager) {
+  constructor(scene, mapManager, enclosureRegistry) {
     this.scene = scene;
     this.mapManager = mapManager;
+    this.enclosureRegistry = enclosureRegistry;
     this.stations = [];
     this.stateStore = scene.registry.get('feedingStationStates') ?? new Map();
     scene.registry.set('feedingStationStates', this.stateStore);
   }
 
   create() {
-    getFeedingStationsForMap(this.mapManager.definition.id).forEach((definition) => {
+    this.getDefinitions().forEach((definition) => {
       const state = this.stateStore.get(definition.id) ?? new FeedingStationState();
       this.stateStore.set(definition.id, state);
       this.stations.push(new FeedingStationView(this.scene, definition, state));
     });
+    this.unsubscribeEnclosure = this.enclosureRegistry.onChange(() => this.refreshFromEnclosures());
+    this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.unsubscribeEnclosure?.());
     return this;
+  }
+
+  getDefinitions() {
+    return this.enclosureRegistry.forMap(this.mapManager.definition.id)
+      .flatMap(({ definition }) => definition.installedObjects)
+      .filter(({ objectType }) => objectType === 'feeding_station')
+      .map(asFeedingStationDefinition);
+  }
+
+  refreshFromEnclosures() {
+    const definitions = this.getDefinitions();
+    definitions.forEach((definition) => {
+      const station = this.stations.find(({ definition: current }) => current.id === definition.id);
+      if (!station) {
+        const state = this.stateStore.get(definition.id) ?? new FeedingStationState();
+        this.stateStore.set(definition.id, state);
+        this.stations.push(new FeedingStationView(this.scene, definition, state));
+        return;
+      }
+      station.definition = definition;
+      const position = worldPoint(definition);
+      station.setPosition(position.x, position.y).syncVisual();
+    });
+    const definitionIds = new Set(definitions.map(({ id }) => id));
+    this.stations = this.stations.filter((station) => {
+      if (definitionIds.has(station.definition.id)) return true;
+      station.destroy();
+      return false;
+    });
   }
 
   findNearestInteraction(x, y, maximumDistance) {

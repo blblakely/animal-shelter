@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { FEEDING_STATIONS } from '../src/data/feedingStations.js';
 import { FOODS, isFoodCompatible } from '../src/data/foods.js';
-import { getMapDefinition } from '../src/data/maps.js';
+import { getEnclosureDefinition } from '../src/data/enclosures.js';
 import { SPECIES } from '../src/data/species.js';
+import { EnclosureState } from '../src/systems/EnclosureSystem.js';
 import { completePhysicalFeeding } from '../src/systems/FeedingBehavior.js';
 import { FeedingStationState } from '../src/systems/FeedingStationState.js';
 
@@ -14,15 +15,15 @@ describe('feeding foundation', () => {
 
   it('places the bowl footprint and interaction point inside the enclosure', () => {
     const bowl = FEEDING_STATIONS[0];
-    const map = getMapDefinition(bowl.mapId);
-    const enclosure = map.layers.enclosures.objects.find(({ id }) => id === bowl.enclosureId);
+    const definition = getEnclosureDefinition(bowl.enclosureId);
+    const enclosure = new EnclosureState({
+      ...definition,
+      installedObjects: definition.installedObjects.filter(({ instanceId }) => instanceId !== bowl.id),
+    });
     for (const point of [bowl, bowl.playerInteraction, bowl.animalUse]) {
-      expect(point.tileX).toBeGreaterThanOrEqual(enclosure.tileX);
-      expect(point.tileX).toBeLessThan(enclosure.tileX + enclosure.width);
-      expect(point.tileY).toBeGreaterThanOrEqual(enclosure.tileY);
-      expect(point.tileY).toBeLessThan(enclosure.tileY + enclosure.height);
+      expect(enclosure.isInterior(point)).toBe(true);
     }
-    expect(map.layers.structure.blocked).not.toContainEqual([bowl.tileX, bowl.tileY]);
+    expect(enclosure.canPlaceObject(bowl).allowed).toBe(true);
   });
 
   it('begins empty, fills without changing hunger, and reserves exclusively', () => {
